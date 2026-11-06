@@ -1,0 +1,49 @@
+name: Extended Build
+run-name: "Extended Build (${{ github.ref_name }})"
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-extended:
+    permissions:
+      contents: read
+      packages: read
+      actions: read
+    uses: $/.github/workflows/build-yocto.yml
+    with:
+      profile: extended
+      skip_if_github_cached: true
+  test-extended:
+    if: needs.build-extended.outputs.build_skipped != 'true'
+    permissions:
+      contents: read
+      actions: read
+      checks: write
+      pull-requests: write
+    uses: $/.github/workflows/test.yml
+    needs: build-extended
+    secrets:
+      LAVATOKEN: ${{ secrets.LAVATOKEN }}
+    with:
+      build_id: ${{ github.run_id }}
+  publish-test-results:
+    if: needs.build-extended.outputs.build_skipped != 'true'
+    permissions:
+      contents: read
+      packages: read
+      actions: read
+      checks: write
+      pull-requests: write
+    uses: $/.github/workflows/publish-results.yml
+    needs: [build-extended, test-extended]
+    secrets:
+      TEST_REPORTING_APP_TOKEN: ${{ secrets.TEST_REPORTING_APP_TOKEN }}
+    with:
+      workflow_id: ${{ github.run_id }}
+      event_name: ${{ github.event_name }}
+      event_file: ${{ github.event_path }}
+      commit: ${{ github.sha }}
